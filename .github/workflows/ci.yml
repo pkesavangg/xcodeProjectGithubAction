@@ -46,7 +46,7 @@ jobs:
           xcodebuild clean build \
             -project LintiTestingProject.xcodeproj \
             -scheme LintiTestingProject \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -57,7 +57,7 @@ jobs:
           xcodebuild test \
             -project LintiTestingProject.xcodeproj \
             -scheme LintiTestingProject \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -only-testing:LintiTestingProjectTests \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -69,7 +69,7 @@ jobs:
           xcodebuild test \
             -project LintiTestingProject.xcodeproj \
             -scheme LintiTestingProject \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -only-testing:LintiTestingProjectUITests \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \

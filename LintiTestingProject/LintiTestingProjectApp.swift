@@ -5,14 +5,12 @@
 //  Created by Kesavan Panchabakesan on 21/01/26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct LintiTestingProjectApp: App {
-    
-    
-    
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self
