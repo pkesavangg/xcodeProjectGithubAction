@@ -41,16 +41,31 @@ jobs:
           xcodebuild -resolvePackageDependencies \
             -project LintiTestingProject.xcodeproj
       
-      - name: Build project
+      - name: Build project (warm up plugin cache)
         run: |
-          xcodebuild clean build \
+          # First build attempt to warm up plugin cache - may fail on validation
+          xcodebuild build \
             -project LintiTestingProject.xcodeproj \
             -scheme LintiTestingProject \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO 2>&1 | tail -30 || true
+        continue-on-error: true
+      
+      - name: Build project
+        run: |
+          xcodebuild build \
+            -project LintiTestingProject.xcodeproj \
+            -scheme LintiTestingProject \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
       
       - name: Run Unit Tests
         run: |
@@ -61,7 +76,8 @@ jobs:
             -only-testing:LintiTestingProjectTests \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
       
       - name: Run UI Tests (Optional - can be slow)
         continue-on-error: false
@@ -73,7 +89,8 @@ jobs:
             -only-testing:LintiTestingProjectUITests \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
       
       - name: Run SwiftLint
         run: |
