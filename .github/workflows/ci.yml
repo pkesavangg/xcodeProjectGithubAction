@@ -41,19 +41,26 @@ jobs:
           xcodebuild -resolvePackageDependencies \
             -project LintiTestingProject.xcodeproj
       
-      - name: Build project (warm up plugin cache)
+      - name: Temporarily disable SwiftLint plugin for CI
         run: |
-          # First build attempt to warm up plugin cache - may fail on validation
-          xcodebuild build \
-            -project LintiTestingProject.xcodeproj \
-            -scheme LintiTestingProject \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            -configuration Debug \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_USER_SCRIPT_SANDBOXING=NO 2>&1 | tail -30 || true
-        continue-on-error: true
+          # Backup project file
+          cp LintiTestingProject.xcodeproj/project.pbxproj LintiTestingProject.xcodeproj/project.pbxproj.backup
+          # Remove SwiftLint plugin dependency from dependencies array
+          python3 << 'EOF'
+          import re
+          
+          with open('LintiTestingProject.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+          
+          # Remove the dependency line from the dependencies array
+          content = re.sub(r'\s+D0BFF8292F20CF55002D8455 /\* PBXTargetDependency \*/,?\n', '', content)
+          
+          # Remove the productRef line
+          content = re.sub(r'\s+productRef = D0BFF8282F20CF55002D8455 /\* SwiftLintBuildToolPlugin \*/,?\n', '', content)
+          
+          with open('LintiTestingProject.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+          EOF
       
       - name: Build project
         run: |
@@ -91,6 +98,12 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO
+      
+      - name: Restore SwiftLint plugin
+        if: always()
+        run: |
+          # Restore project file
+          mv LintiTestingProject.xcodeproj/project.pbxproj.backup LintiTestingProject.xcodeproj/project.pbxproj || true
       
       - name: Run SwiftLint
         run: |
