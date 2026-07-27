@@ -1,0 +1,40 @@
+name: Zephyr Automation Coverage → Slack DM
+
+# Posts the meApp Zephyr (project MA) approved automation-coverage snapshot
+# to Kesavan's Slack DM every weekday morning.
+#
+# GitHub-hosted runners can reach api.zephyrscale.smartbear.com directly, which
+# the Anthropic cloud-routine sandbox cannot — that egress block is why the old
+# scheduled agent failed. This runs the fetch where Zephyr is reachable.
+
+on:
+  schedule:
+    # 02:30 UTC = 08:00 IST, Monday–Friday.
+    # NOTE: GitHub Actions cron can lag 5–90+ min under load — arrival time drifts.
+    - cron: "30 2 * * 1-5"
+  workflow_dispatch: {} # manual "Run workflow" button for testing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zephyr-coverage
+  cancel-in-progress: false
+
+jobs:
+  post-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Post Zephyr coverage snapshot
+        env:
+          ZEPHYR_API_TOKEN: ${{ secrets.ZEPHYR_API_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python3 scripts/zephyr_coverage.py
