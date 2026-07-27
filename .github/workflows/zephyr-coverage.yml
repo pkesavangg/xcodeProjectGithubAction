@@ -1,11 +1,17 @@
 name: Zephyr Automation Coverage → Slack DM
 
-# Posts the meApp Zephyr (project MA) approved automation-coverage snapshot
-# to Kesavan's Slack DM every weekday morning.
+# Posts the meApp Zephyr (project MA) approved automation-coverage snapshot to
+# Kesavan's Slack DM every weekday morning, with an optional per-assignee
+# breakdown and daily throughput (how many cases became automated since the
+# previous run, by assignee).
 #
 # GitHub-hosted runners can reach api.zephyrscale.smartbear.com directly, which
 # the Anthropic cloud-routine sandbox cannot — that egress block is why the old
 # scheduled agent failed. This runs the fetch where Zephyr is reachable.
+#
+# The daily-throughput diff needs state between runs. Zephyr has no field-change
+# history, so each run persists the set of automated (Yes) case keys to the
+# dedicated `zephyr-state` branch and diffs against the previous snapshot.
 
 on:
   schedule:
@@ -15,7 +21,7 @@ on:
   workflow_dispatch: {} # manual "Run workflow" button for testing
 
 permissions:
-  contents: read
+  contents: write # needed to push the snapshot to the zephyr-state branch
 
 concurrency:
   group: zephyr-coverage
@@ -33,8 +39,50 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Load prior snapshot from zephyr-state
+        run: |
+          mkdir -p .state
+          if git ls-remote --exit-code --heads origin zephyr-state >/dev/null 2>&1; then
+            git fetch --depth=1 origin zephyr-state
+            git show FETCH_HEAD:zephyr-yes-keys.json > .state/prior.json 2>/dev/null || echo '{}' > .state/prior.json
+            echo "Loaded prior snapshot."
+          else
+            echo '{}' > .state/prior.json
+            echo "No zephyr-state branch yet — this is a baseline run."
+          fi
+
       - name: Post Zephyr coverage snapshot
         env:
           ZEPHYR_API_TOKEN: ${{ secrets.ZEPHYR_API_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          STATE_IN: .state/prior.json
+          STATE_OUT: .state/new.json
         run: python3 scripts/zephyr_coverage.py
+
+      - name: Persist today's snapshot to zephyr-state
+        run: |
+          if [ ! -f .state/new.json ]; then
+            echo "No new snapshot written — skipping persist."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin zephyr-state >/dev/null 2>&1; then
+            git fetch --depth=1 origin zephyr-state
+            git worktree add sb FETCH_HEAD
+            git -C sb checkout -B zephyr-state
+          else
+            git worktree add --detach sb
+            git -C sb checkout --orphan zephyr-state
+            git -C sb rm -rf . >/dev/null 2>&1 || true
+          fi
+          cp .state/new.json sb/zephyr-yes-keys.json
+          git -C sb add zephyr-yes-keys.json
+          if git -C sb commit -m "Zephyr automated-keys snapshot [skip ci]"; then
+            git -C sb push origin zephyr-state
+            echo "Snapshot pushed to zephyr-state."
+          else
+            echo "No change in snapshot — nothing to push."
+          fi
