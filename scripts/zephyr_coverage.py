@@ -19,6 +19,7 @@ Env vars (set as GitHub Actions secrets / workflow env):
   JIRA_EMAIL        - Atlassian account email    [optional; enables assignee/delta split]
   JIRA_API_TOKEN    - Atlassian API token        [optional; enables assignee/delta split]
   JIRA_BASE_URL     - optional, defaults to https://greatergoods.atlassian.net
+  ARTIFACT_URL      - optional, published pending-automation page; adds the link + call-to-action
   STATE_IN          - path to the previous snapshot JSON (default .state/prior.json)
   STATE_OUT         - path to write today's snapshot JSON  (default .state/new.json)
 
@@ -132,18 +133,22 @@ def collect_metrics(token):
 
 
 def resolve_assignees(keys):
-    """task key -> assignee first-name, via Jira. {} if creds absent or lookup fails."""
+    """Jira lookup -> (task key -> assignee first-name, task key -> status name).
+
+    Both maps are empty if creds are absent or the lookup fails — callers degrade.
+    """
     email = os.environ.get("JIRA_EMAIL")
     token = os.environ.get("JIRA_API_TOKEN")
     if not (email and token) or not keys:
-        return {}
+        return {}, {}
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
     out = {}
+    statuses = {}
     try:
         for i in range(0, len(keys), 90):
             batch = keys[i:i + 90]
             jql = "key in (" + ",".join(batch) + ")"
-            body = json.dumps({"jql": jql, "fields": ["assignee"], "maxResults": 100}).encode()
+            body = json.dumps({"jql": jql, "fields": ["assignee", "status"], "maxResults": 100}).encode()
             req = urllib.request.Request(
                 f"{JIRA_BASE}/rest/api/3/search/jql",
                 data=body,
@@ -156,13 +161,15 @@ def resolve_assignees(keys):
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read().decode())
             for issue in data.get("issues", []):
-                a = (issue.get("fields") or {}).get("assignee")
+                fields = issue.get("fields") or {}
+                a = fields.get("assignee")
                 name = a.get("displayName") if a else "Unassigned"
                 out[issue["key"]] = (name or "Unassigned").split()[0]  # first name, compact
+                statuses[issue["key"]] = ((fields.get("status") or {}).get("name") or "")
     except Exception as e:  # noqa: BLE001 - additive, never fail the run
         warn(f"Jira assignee lookup failed: {e}")
-        return {}
-    return out
+        return {}, {}
+    return out, statuses
 
 
 def dotpad(label, width, val, extra=""):
@@ -213,7 +220,48 @@ def build_delta_block(m, k2a, prior):
     return block
 
 
-def build_message(m, k2a, prior):
+CLOSED_STATUSES = {"Done", "Cancelled"}
+
+
+def count_no_open_task(m, k2s):
+    """Pending (No) cases whose automation task is Done/Cancelled, plus those with no task.
+
+    These are the ones nobody is scheduled to write — a closed ticket cannot carry them.
+    Returns None when task statuses are unavailable, so the block is simply omitted.
+    """
+    if not k2s:
+        return None
+    stranded = sum(
+        n - m["task_cases_yes"].get(key, 0)
+        for key, n in m["task_cases"].items()
+        if k2s.get(key) in CLOSED_STATUSES
+    )
+    return stranded + m["no_task_empty"]
+
+
+def build_artifact_block(m, k2s):
+    url = os.environ.get("ARTIFACT_URL", "").strip()
+    if not url:
+        return ""
+    stranded = count_no_open_task(m, k2s)
+    detail = (
+        f"\n*{stranded:,}* of the {m['no']:,} pending cases sit under a Jira task that is already "
+        "*Done or Cancelled* (or have no task at all) — nothing is scheduled to write them."
+        if stranded is not None else ""
+    )
+    return (
+        f"\n\n<{url}|Pending automation — full case list>"
+        "\n_Every pending case with its Zephyr folder, case owner, linked Jira automation task "
+        "and that task's status/assignee — searchable and filterable by person._"
+        f"{detail}"
+        "\n\n*What to do:*"
+        "\n• Automation already written and running — set `Automation Status` to *Yes* on the Zephyr case."
+        "\n• Case can't move to Yes yet — create a Jira task and fill the `Automation Task` field "
+        "on the Zephyr case, so it stays tracked."
+    )
+
+
+def build_message(m, k2a, prior, k2s=None):
     today = datetime.now(IST).strftime("%a %d %b %Y")
     pct = (100 * m["yes"] / m["automatable"]) if m["automatable"] else 0
     table = "\n".join([
@@ -231,6 +279,7 @@ def build_message(m, k2a, prior):
         f"_Excluded: Not Feasible {m['not_feasible']:,} · blank {m['blank']:,}_"
         + build_assignee_block(m, k2a)
         + build_delta_block(m, k2a, prior)
+        + build_artifact_block(m, k2s or {})
     )
 
 
@@ -278,9 +327,9 @@ def main():
     if not webhook:
         die("SLACK_WEBHOOK_URL is not set.")
     metrics = collect_metrics(token)
-    k2a = resolve_assignees(sorted(metrics["task_cases"]))
+    k2a, k2s = resolve_assignees(sorted(metrics["task_cases"]))
     prior = load_prior()
-    message = build_message(metrics, k2a, prior)
+    message = build_message(metrics, k2a, prior, k2s)
     print("Computed snapshot:")
     print(message)
     post_to_slack(message, webhook)
