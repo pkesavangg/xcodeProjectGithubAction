@@ -57,6 +57,9 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          # Published pending-automation page. A secret, not a literal — this repo is public
+          # and the artifact is shared, not world-readable. Absent => the link block is omitted.
+          ARTIFACT_URL: ${{ secrets.ARTIFACT_URL }}
           STATE_IN: .state/prior.json
           STATE_OUT: .state/new.json
         run: python3 scripts/zephyr_coverage.py
