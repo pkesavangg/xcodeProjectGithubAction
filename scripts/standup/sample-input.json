@@ -1,0 +1,89 @@
+{
+ "window": "Thu 13 Aug 08:30 - Fri 14 Aug 08:30 IST",
+ "generated": "Fri 14 Aug 2026, 08:34 IST",
+ "sprints": [
+  {
+   "id": 6141,
+   "name": "MOB DEV Sprint 33"
+  }
+ ],
+ "branch_keys": [
+  "MOB-1002"
+ ],
+ "merged_keys": [
+  "MOB-1003"
+ ],
+ "openpr_keys": [
+  "MOB-1002"
+ ],
+ "people": [
+  {
+   "name": "Dev One",
+   "role": "Android",
+   "tester": false,
+   "worked": [
+    {
+     "key": "MOB-1001",
+     "summary": "Example task that had time logged",
+     "seconds": 14400,
+     "total_seconds": 14400,
+     "oe_seconds": 18000,
+     "sp": null
+    }
+   ],
+   "issues": [
+    {
+     "key": "MOB-1002",
+     "summary": "Example in-progress task with an open PR",
+     "status": "In Progress",
+     "oe_seconds": 7200,
+     "sp": null
+    },
+    {
+     "key": "MOB-1003",
+     "summary": "Example task whose PR already merged",
+     "status": "In Review",
+     "oe_seconds": null,
+     "sp": 2
+    },
+    {
+     "key": "MOB-1004",
+     "summary": "Example unsized task",
+     "status": "To Do",
+     "oe_seconds": null,
+     "sp": null
+    }
+   ],
+   "prs": [
+    {
+     "repo": "meApp",
+     "number": 1234,
+     "title": "MOB-1002 example open pull request",
+     "url": "https://github.com/gg-engineering/meApp/pull/1234",
+     "branch": "MOB-1002-example",
+     "conflict": false,
+     "review": "CHANGES_REQUESTED",
+     "keys": [
+      "MOB-1002"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "QA Two",
+   "role": "QA",
+   "tester": true,
+   "worked": [],
+   "issues": [
+    {
+     "key": "MOB-1005",
+     "summary": "Example issue sitting in QA",
+     "status": "In QA",
+     "oe_seconds": null,
+     "sp": null
+    }
+   ],
+   "prs": []
+  }
+ ]
+}
